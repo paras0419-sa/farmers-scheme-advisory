@@ -1,1 +1,36 @@
-*.md
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+
+# ChromaDB data
+chroma_db/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Byte-compiled
+*.pyc
+
+# Project-specific exclusions
+future-extensions/
+farmers-scheme.md
