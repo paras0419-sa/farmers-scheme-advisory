@@ -58,7 +58,7 @@ class SchemeRetriever:
                     "text": doc,
                     "source": metadata["source_file"],
                     "scheme_name": metadata["scheme_name"],
-                    "score": round(1 / (1 + distance), 4),
+                    "score": round(1 - distance, 4),
                     "chunk_index": metadata["chunk_index"],
                 }
             )
