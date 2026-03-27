@@ -21,8 +21,8 @@ CHROMA_DIR = ROOT_DIR / "chroma_db"
 
 EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 COLLECTION_NAME = "farmer_schemes"
-CHUNK_SIZE = 500  # characters (not tokens — simpler and close enough for MVP)
-CHUNK_OVERLAP = 100
+CHUNK_SIZE = 700  # characters (not tokens — simpler and close enough for MVP)
+CHUNK_OVERLAP = 200
 
 
 def load_documents(data_dir: Path) -> list[dict]:
@@ -61,8 +61,9 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     return chunks
 
 
-def chunk_by_sections(text: str) -> list[str]:
-    """Split markdown into sections based on ## headings. Falls back to character chunking for large sections."""
+def chunk_by_sections(text: str, scheme_name: str) -> list[str]:
+    """Split markdown into sections based on ## headings. Falls back to character chunking for large sections.
+    Prepends scheme name context to each chunk for better embedding quality."""
     sections = []
     current_section = []
     current_heading = ""
@@ -84,13 +85,25 @@ def chunk_by_sections(text: str) -> list[str]:
         if section_text:
             sections.append(section_text)
 
-    # If any section is too large, sub-chunk it
+    # Prepend scheme name context and sub-chunk large sections
     final_chunks = []
     for section in sections:
-        if len(section) > CHUNK_SIZE * 2:
-            final_chunks.extend(chunk_text(section))
+        # Extract section heading if present
+        first_line = section.split("\n", 1)[0].strip()
+        if first_line.startswith("## "):
+            section_label = first_line[3:].strip()
+            prefix = f"{scheme_name} — {section_label}:\n"
+        elif first_line.startswith("# "):
+            prefix = ""  # Header chunk already contains the scheme name
         else:
-            final_chunks.append(section)
+            prefix = f"{scheme_name}:\n"
+
+        prefixed = prefix + section if prefix else section
+
+        if len(prefixed) > CHUNK_SIZE * 2:
+            final_chunks.extend(chunk_text(prefixed))
+        else:
+            final_chunks.append(prefixed)
 
     return final_chunks
 
@@ -102,7 +115,7 @@ def build_chunks(docs: list[dict]) -> tuple[list[str], list[str], list[dict]]:
     all_metadatas = []
 
     for doc in docs:
-        chunks = chunk_by_sections(doc["text"])
+        chunks = chunk_by_sections(doc["text"], doc["scheme_name"])
         for i, chunk in enumerate(chunks):
             chunk_id = f"{doc['filename']}::chunk_{i}"
             all_ids.append(chunk_id)
@@ -143,7 +156,10 @@ def ingest(data_dir: Path = DATA_DIR, chroma_dir: Path = CHROMA_DIR) -> chromadb
 
     collection = client.create_collection(
         name=COLLECTION_NAME,
-        metadata={"description": "Indian government farmer scheme documents"},
+        metadata={
+            "description": "Indian government farmer scheme documents",
+            "hnsw:space": "cosine",
+        },
     )
 
     # ChromaDB has a batch limit, add in batches of 100
@@ -178,7 +194,7 @@ def test_query(query: str, chroma_dir: Path = CHROMA_DIR):
     for i, (doc, metadata, distance) in enumerate(
         zip(results["documents"][0], results["metadatas"][0], results["distances"][0])
     ):
-        print(f"[{i+1}] Score: {1 - distance:.3f} | Source: {metadata['scheme_name']}")
+        print(f"[{i+1}] Similarity: {1 - distance:.3f} | Source: {metadata['scheme_name']}")
         print(f"    {doc[:200]}...")
         print()
 
