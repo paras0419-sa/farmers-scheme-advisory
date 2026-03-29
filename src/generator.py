@@ -10,6 +10,7 @@ Usage:
 """
 
 import ollama
+from ollama import ResponseError
 
 SYSTEM_PROMPT = """You are KisanSathi, an agricultural scheme advisor for Indian farmers.
 Your job is to help farmers understand government schemes they may be eligible for.
@@ -59,16 +60,22 @@ Farmer's Question: {query}
 
 Answer the question using only the context above. Cite scheme names."""
 
-        response = ollama.chat(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
-            options={"temperature": temperature},
-        )
-
-        return response["message"]["content"]
+        try:
+            response = ollama.chat(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_message},
+                ],
+                options={"temperature": temperature, "num_predict": 512},
+            )
+            return response["message"]["content"]
+        except ResponseError as e:
+            raise RuntimeError(f"LLM generation failed: {e}") from e
+        except Exception as e:
+            if "timeout" in str(e).lower() or "connection" in str(e).lower():
+                raise TimeoutError("LLM is not responding. Is Ollama running?") from e
+            raise
 
 
 if __name__ == "__main__":

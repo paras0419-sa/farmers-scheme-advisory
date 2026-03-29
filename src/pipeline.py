@@ -17,12 +17,27 @@ Usage:
     print(result["answer"])
 """
 
+import logging
 from typing import Optional
 
 from src.generator import SchemeGenerator
 from src.retriever import SchemeRetriever
 from src.translator import SchemeTranslator
 from src.verifier import AnswerVerifier
+
+logger = logging.getLogger(__name__)
+
+RELEVANCE_THRESHOLD = 0.25
+NO_SCHEME_MSG_EN = (
+    "I could not find a relevant government scheme for your question. "
+    "Please try rephrasing, or ask about a specific scheme like PM-KISAN, "
+    "PMFBY, Kisan Credit Card, etc."
+)
+NO_SCHEME_MSG_HI = (
+    "आपके प्रश्न से संबंधित कोई सरकारी योजना नहीं मिली। "
+    "कृपया दोबारा पूछें, या किसी विशेष योजना के बारे में पूछें "
+    "जैसे PM-KISAN, PMFBY, किसान क्रेडिट कार्ड आदि।"
+)
 
 
 class KisanSathiPipeline:
@@ -53,18 +68,28 @@ class KisanSathiPipeline:
         Returns:
             Dict with: answer, sources, grounding, language, english_query
         """
+        # Validate input
+        cleaned = query.strip()
+        if not cleaned or len(cleaned) < 2:
+            return self._no_result(query, lang or "en", reason="empty_input")
+
         # Auto-detect language if not specified
         if lang is None:
-            lang = self.translator.detect_language(query)
+            lang = self.translator.detect_language(cleaned)
 
         # Translate Hindi → English for retrieval
         if lang == "hi":
-            english_query = self.translator.hindi_to_english(query)
+            english_query = self.translator.hindi_to_english(cleaned)
         else:
-            english_query = query
+            english_query = cleaned
 
         # Retrieve relevant chunks
         chunks = self.retriever.retrieve(english_query, top_k=self.top_k)
+
+        # Check if retrieved chunks are relevant enough
+        if not chunks or chunks[0]["score"] < RELEVANCE_THRESHOLD:
+            logger.info("No relevant chunks (top score: %s)", chunks[0]["score"] if chunks else "N/A")
+            return self._no_result(english_query, lang, reason="no_relevant_scheme")
 
         # Generate answer in English
         english_answer = self.generator.generate(english_query, chunks)
@@ -91,6 +116,19 @@ class KisanSathiPipeline:
             "sources": sources,
             "grounding": grounding,
             "language": lang,
+        }
+
+    def _no_result(self, query: str, lang: str, reason: str) -> dict:
+        """Return a structured response when no answer can be produced."""
+        answer = NO_SCHEME_MSG_HI if lang == "hi" else NO_SCHEME_MSG_EN
+        return {
+            "answer": answer,
+            "english_answer": NO_SCHEME_MSG_EN,
+            "english_query": query,
+            "sources": [],
+            "grounding": {"score": 0.0, "is_grounded": True, "warning": None, "answer_tokens": 0, "overlap_tokens": 0},
+            "language": lang,
+            "no_result_reason": reason,
         }
 
     def voice_query(self, audio_path: str) -> dict:

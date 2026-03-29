@@ -13,6 +13,7 @@ Usage:
 """
 
 import ollama
+from ollama import ResponseError
 
 
 class SchemeTranslator:
@@ -30,24 +31,29 @@ class SchemeTranslator:
         Returns:
             English translation string.
         """
-        response = ollama.chat(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a Hindi to English translator. "
-                        "Translate the given Hindi text to English. "
-                        "Output ONLY the English translation, nothing else. "
-                        "Do not add explanations, notes, or formatting. "
-                        "Preserve proper nouns and scheme names as-is."
-                    ),
-                },
-                {"role": "user", "content": text},
-            ],
-            options={"temperature": 0.1},
-        )
-        return response["message"]["content"].strip()
+        try:
+            response = ollama.chat(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a Hindi to English translator. "
+                            "Translate the given Hindi text to English. "
+                            "Output ONLY the English translation, nothing else. "
+                            "Do not add explanations, notes, or formatting. "
+                            "Preserve proper nouns and scheme names as-is."
+                        ),
+                    },
+                    {"role": "user", "content": text},
+                ],
+                options={"temperature": 0.1, "num_predict": 256},
+            )
+            return response["message"]["content"].strip()
+        except (ResponseError, Exception) as e:
+            if "timeout" in str(e).lower() or "connection" in str(e).lower():
+                raise TimeoutError("Translation failed. Is Ollama running?") from e
+            raise
 
     def english_to_hindi(self, text: str) -> str:
         """Translate English text to Hindi for the user.
@@ -58,25 +64,30 @@ class SchemeTranslator:
         Returns:
             Hindi translation string.
         """
-        response = ollama.chat(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an English to Hindi translator. "
-                        "Translate the given English text to Hindi (Devanagari script). "
-                        "Output ONLY the Hindi translation, nothing else. "
-                        "Do not add explanations, notes, or formatting. "
-                        "Preserve proper nouns, scheme names, and numbers as-is. "
-                        "Use simple Hindi that a farmer would understand."
-                    ),
-                },
-                {"role": "user", "content": text},
-            ],
-            options={"temperature": 0.1},
-        )
-        return response["message"]["content"].strip()
+        try:
+            response = ollama.chat(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an English to Hindi translator. "
+                            "Translate the given English text to Hindi (Devanagari script). "
+                            "Output ONLY the Hindi translation, nothing else. "
+                            "Do not add explanations, notes, or formatting. "
+                            "Preserve proper nouns, scheme names, and numbers as-is. "
+                            "Use simple Hindi that a farmer would understand."
+                        ),
+                    },
+                    {"role": "user", "content": text},
+                ],
+                options={"temperature": 0.1, "num_predict": 512},
+            )
+            return response["message"]["content"].strip()
+        except (ResponseError, Exception) as e:
+            if "timeout" in str(e).lower() or "connection" in str(e).lower():
+                raise TimeoutError("Translation failed. Is Ollama running?") from e
+            raise
 
     def detect_language(self, text: str) -> str:
         """Simple heuristic to detect if text is Hindi or English.

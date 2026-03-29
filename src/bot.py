@@ -102,6 +102,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not query:
         return
 
+    if len(query) > 500:
+        await update.message.reply_text(
+            "Your message is too long. Please keep your question under 500 characters."
+        )
+        return
+
     logger.info("Text query from %s: %s", update.effective_user.id, query[:100])
 
     # Send typing indicator
@@ -111,6 +117,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = pipeline.text_query(query)
         response = format_response(result)
         await update.message.reply_text(response)
+    except TimeoutError:
+        logger.error("LLM timeout for query: %s", query[:100])
+        await update.message.reply_text(
+            "The AI model is taking too long to respond. Please try again in a moment."
+        )
+    except RuntimeError as e:
+        logger.error("LLM error: %s", e)
+        await update.message.reply_text(
+            "The AI model encountered an error. Please make sure the service is running and try again."
+        )
     except Exception as e:
         logger.error("Error processing text query: %s", e)
         await update.message.reply_text(
@@ -147,6 +163,16 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Clean up temp file
         os.unlink(ogg_path)
 
+    except TimeoutError:
+        logger.error("LLM timeout for voice message")
+        await update.message.reply_text(
+            "The AI model is taking too long to respond. Please try again in a moment."
+        )
+    except RuntimeError as e:
+        logger.error("LLM error on voice: %s", e)
+        await update.message.reply_text(
+            "The AI model encountered an error. Please try again or send a text message."
+        )
     except Exception as e:
         logger.error("Error processing voice message: %s", e)
         await update.message.reply_text(
