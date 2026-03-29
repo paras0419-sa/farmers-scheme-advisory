@@ -13,6 +13,13 @@ An AI-powered Telegram bot that helps Indian farmers discover and understand gov
 - **Fully Local** — Runs on your machine with Ollama + Mistral 7B. No cloud APIs, no data leaves your device
 - **Source Citations** — Every answer includes the scheme name it was sourced from
 
+## Demo
+
+|                         /start & /help                          |                           English Query                           |                              Hindi Query                               |                            Voice Query                            |
+| :-------------------------------------------------------------: | :---------------------------------------------------------------: | :--------------------------------------------------------------------: | :---------------------------------------------------------------: |
+|             ![Start & Help](demo/01-start-help.png)             |               ![English](demo/02-english-query.png)               |                   ![Hindi](demo/03-hindi-query.png)                    |                 ![Voice](demo/04-voice-query.png)                 |
+| Bot welcome message with usage instructions and example queries | English text query returning scheme details with source citations | Hindi text query with auto-translation and Hindi response with sources | Hindi voice note transcription followed by scheme answer in Hindi |
+
 ## Architecture
 
 ```
